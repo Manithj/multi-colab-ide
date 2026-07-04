@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+_script="${BASH_SOURCE[0]}"
+while [[ -L "$_script" ]]; do
+  _dir="$(cd "$(dirname "$_script")" && pwd)"
+  _script="$(readlink "$_script")"
+  [[ "$_script" != /* ]] && _script="$_dir/$_script"
+done
+TOOLKIT_DIR="$(cd "$(dirname "$_script")" && pwd)"
+# shellcheck source=lib/load-profile.sh
+source "$TOOLKIT_DIR/lib/load-profile.sh"
+
+multi_colab_ide_load_active_profile
+
+REAL_COLAB="${MULTI_COLAB_IDE_REAL_BIN:-$HOME/.local/bin/colab-real}"
+if [[ ! -x "$REAL_COLAB" ]]; then
+  if command -v colab-real >/dev/null 2>&1; then
+    REAL_COLAB="$(command -v colab-real)"
+  else
+    echo "multi-colab-ide: colab-real not found at $REAL_COLAB" >&2
+    echo "Install colab-cli, then run: $TOOLKIT_DIR/install.sh" >&2
+    exit 1
+  fi
+fi
+
+exec "$REAL_COLAB" "$@"

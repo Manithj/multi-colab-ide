@@ -13,21 +13,44 @@ source "$TOOLKIT_DIR/lib/common.sh"
 
 usage() {
   cat <<EOF
-Usage: setup-account <account-id>
+Usage: mci-setup <account-id> [--no-launch-browser]
 
 Authenticate one Google profile into its isolated gcloud config directory.
 
-This runs:
+Runs:
   gcloud auth login
   gcloud auth application-default login (with Colab scopes)
 
+WSL tip: if the browser does not open, add --no-launch-browser and paste
+the URL into your Windows browser.
+
 Example:
-  $TOOLKIT_DIR/setup-account 1
+  mci-setup 1
+  mci-setup 2 --no-launch-browser
 EOF
 }
 
 main() {
-  local choice="${1:-}"
+  local choice=""
+  local browser_flag=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      --no-launch-browser)
+        browser_flag="--no-launch-browser"
+        shift
+        ;;
+      *)
+        choice="$1"
+        shift
+        ;;
+    esac
+  done
+
   if [[ -z "$choice" ]]; then
     print_account_menu
     read -r -p "Choice: " choice
@@ -46,35 +69,43 @@ main() {
   mkdir -p "$config_dir/colab-cli"
   export CLOUDSDK_CONFIG="$config_dir"
 
+  if [[ -z "$browser_flag" ]]; then
+    browser_flag="$(gcloud_browser_flag)"
+  fi
+
   echo "Setting up: $label"
   echo "Config dir: $CLOUDSDK_CONFIG"
+  if is_wsl; then
+    echo "Platform:   WSL"
+    if [[ "$browser_flag" == "--no-launch-browser" ]]; then
+      echo "Browser:    copy-paste mode (open the printed URL in your Windows browser)"
+    fi
+  fi
   echo
 
   echo "Step 1/2: gcloud auth login"
-  gcloud auth login
+  # shellcheck disable=SC2086
+  gcloud auth login $browser_flag
 
   echo
   echo "Step 2/2: gcloud auth application-default login (Colab scopes)"
-  gcloud auth application-default login --scopes="$COLAB_ADC_SCOPES"
+  # shellcheck disable=SC2086
+  gcloud auth application-default login --scopes="$COLAB_ADC_SCOPES" $browser_flag
 
   echo
   email="$(gcloud_account_email || true)"
   if [[ -n "$email" && -f "$ACCOUNTS_FILE" ]]; then
-    # Replace the label field for this account id with the authenticated email.
     awk -F'|' -v id="$choice" -v email="$email" '
       $1 == id { $2 = email }
       { print $1 "|" $2 "|" $3 }
     ' "$ACCOUNTS_FILE" >"$ACCOUNTS_FILE.tmp" && mv "$ACCOUNTS_FILE.tmp" "$ACCOUNTS_FILE"
   fi
 
-  echo "Done."
-  echo "Verify with: CLOUDSDK_CONFIG=$CLOUDSDK_CONFIG $TOOLKIT_DIR/verify"
-  echo "Launch Cursor: multi-colab $choice"
-}
+  persist_active_profile "$config_dir"
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
+  echo "Done."
+  echo "Verify : mci-verify"
+  echo "Launch : multi-colab-ide $choice"
+}
 
 main "$@"

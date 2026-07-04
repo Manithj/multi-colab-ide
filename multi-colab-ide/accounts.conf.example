@@ -1,7 +1,7 @@
-# multi-colab account registry
+# multi-colab-ide account registry
 # Format: id|label|gcloud_config_directory
 #
-# Copy to accounts.conf and edit labels/emails after first-time auth.
+# Copy to accounts.conf and edit labels after first-time auth.
 # Each config directory is isolated via CLOUDSDK_CONFIG.
 
 1|account1@gmail.com|~/.config/gcloud-account1

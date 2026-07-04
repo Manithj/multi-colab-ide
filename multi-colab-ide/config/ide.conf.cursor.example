@@ -1,0 +1,21 @@
+# Cursor IDE preset for multi-colab-ide
+#
+# Cursor does NOT ship a standard CLI command (unlike VS Code's `code`).
+# You need your own launcher script or shell alias on your system.
+#
+# Recommended: copy and edit the example launcher, then point IDE_COMMAND at it.
+#
+#   cp config/cursor-launcher.example.sh ~/.local/bin/cursor
+#   chmod +x ~/.local/bin/cursor
+#   # edit the AppImage/binary path inside the script
+#   cp config/ide.conf.cursor.example ~/.config/multi-colab-ide/ide.conf
+#
+# Or set IDE_COMMAND to any script/binary you already use:
+
+IDE_COMMAND="$HOME/.local/bin/cursor"
+
+# Optional: full path to AppImage if you prefer not to use a wrapper script
+# IDE_COMMAND="/path/to/cursor.AppImage"
+# IDE_ARGS="--no-sandbox"
+
+IDE_ARGS=""

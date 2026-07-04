@@ -11,10 +11,8 @@ TOOLKIT_DIR="$(cd "$(dirname "$_script")" && pwd)"
 # shellcheck source=lib/common.sh
 source "$TOOLKIT_DIR/lib/common.sh"
 
-# If no env is set in this shell, try the last launcher choice.
-if [[ -z "${CLOUDSDK_CONFIG:-}" && -f "$HOME/.config/multi-colab/active" ]]; then
-  active_dir="$(cat "$HOME/.config/multi-colab/active")"
-  apply_account_env "$active_dir"
+if [[ -z "${CLOUDSDK_CONFIG:-}" && -f "$STATE_DIR/active" ]]; then
+  apply_account_env "$(<"$STATE_DIR/active")"
 fi
 
 echo "========================="
@@ -29,7 +27,11 @@ if [[ -n "${CLOUDSDK_CONFIG:-}" ]]; then
   fi
 else
   echo "CLOUDSDK_CONFIG: (not set — using default ~/.config/gcloud)"
-  export CLOUDSDK_CONFIG="${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}"
+  export CLOUDSDK_CONFIG="${HOME}/.config/gcloud"
+fi
+
+if is_wsl; then
+  echo "Environment:     WSL"
 fi
 
 echo
@@ -45,7 +47,7 @@ echo "Application Default Credentials:"
 if adc_configured; then
   echo "  OK — $GOOGLE_APPLICATION_CREDENTIALS"
 else
-  echo "  Missing — run setup-account for this profile"
+  echo "  Missing — run mci-setup for this profile"
 fi
 
 echo

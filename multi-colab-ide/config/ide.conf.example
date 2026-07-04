@@ -1,0 +1,16 @@
+# IDE launcher configuration for multi-colab-ide
+# Copy to ~/.config/multi-colab-ide/ide.conf and edit.
+
+# Command must be available in PATH when multi-colab-ide runs.
+# Examples:
+#   VS Code:        IDE_COMMAND="code"
+#   VSCodium:       IDE_COMMAND="codium"
+#   Cursor:         IDE_COMMAND="$HOME/.local/bin/cursor"   # custom launcher — see config/cursor-launcher.example.sh
+#   Windsurf:       IDE_COMMAND="windsurf"
+#   JetBrains:      IDE_COMMAND="idea"
+
+IDE_COMMAND="code"
+
+# Optional extra arguments passed before project paths.
+# Example: IDE_ARGS="--new-window"
+IDE_ARGS=""

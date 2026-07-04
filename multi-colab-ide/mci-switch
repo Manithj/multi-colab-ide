@@ -14,12 +14,13 @@ source "$TOOLKIT_DIR/lib/common.sh"
 usage() {
   cat <<EOF
 Usage:
-  source account-switch [account-id]    # switch the current shell
-  account-switch [account-id]         # print export commands
+  source mci-switch [account-id]    # switch the current shell (bash/zsh)
+  mci-switch [account-id]           # print export commands
 
 Examples:
-  source ~/.local/bin/account-switch
-  source ~/.local/bin/account-switch 2
+  source mci-switch
+  source mci-switch 2
+  eval "\$(mci-switch 2)"
 EOF
 }
 
@@ -31,11 +32,10 @@ emit_exports() {
 export CLOUDSDK_CONFIG='$config_dir'
 export GOOGLE_APPLICATION_CREDENTIALS='$config_dir/application_default_credentials.json'
 export COLAB_CLI_CONFIG='$config_dir/colab-cli/sessions.json'
-export MULTI_COLAB_ACCOUNT_DIR='$config_dir'
+export MULTI_COLAB_IDE_ACCOUNT_DIR='$config_dir'
 # Active account: $label
 EOF
-  mkdir -p "$HOME/.config/multi-colab"
-  printf '%s\n' "$config_dir" >"$HOME/.config/multi-colab/active"
+  persist_active_profile "$config_dir"
 }
 
 main() {
@@ -62,7 +62,7 @@ main() {
     echo "  CLOUDSDK_CONFIG=$CLOUDSDK_CONFIG"
   else
     emit_exports "$config_dir" "$label"
-    echo "# Run: eval \"\$(account-switch $choice)\"" >&2
+    echo "# Run: eval \"\$(mci-switch $choice)\"" >&2
   fi
 }
 

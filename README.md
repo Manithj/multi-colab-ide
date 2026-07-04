@@ -1,103 +1,262 @@
-# multi-colab-cli
+# multi-colab-ide
 
-Launch **IDE** with an isolated Google Cloud credential profile so Colab CLI, `gcloud`, and Colab MCP all use the correct Google account.
+Use **multiple Google accounts** with **Google Colab CLI** inside your IDE — without credential conflicts.
 
-## Why this works
+Each account gets an isolated `CLOUDSDK_CONFIG` profile. Launch your IDE through `multi-colab-ide`, and every integrated terminal, extension, and MCP server in that window uses the correct Google identity.
 
-Each profile gets its own `CLOUDSDK_CONFIG` directory. That isolates:
+Works on **Linux**, **macOS**, and **WSL**. Supports **bash** and **zsh**.
 
-- `gcloud auth login` accounts
-- `gcloud auth application-default login` (ADC) — what **colab CLI** uses by default (`--auth=adc`)
-- Colab session metadata (`<config>/colab-cli/sessions.json`)
+---
 
-When you launch the IDE through `multi-colab`, every terminal and MCP server inside that window inherits the same environment.
+## Why this exists
 
-## Install
+Google Colab CLI authenticates via Application Default Credentials (ADC). By default, all tools share one gcloud config — so switching accounts breaks sessions, agents, and terminal commands.
+
+This toolkit gives each Google account its own credential directory and makes it easy to:
+
+- Launch your IDE bound to a specific account
+- Run `colab --auth=adc` without prefixing environment variables
+- Switch accounts per terminal session
+- Keep Colab session state separate per account
+
+---
+
+## Requirements
+
+| Tool | Purpose |
+|------|---------|
+| [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`gcloud`) | Authentication |
+| [Colab CLI](https://github.com/googlecolab/colab-cli) (`pip install colab-cli`) | Colab sessions |
+| bash or zsh | Shell |
+| Your IDE CLI in PATH | e.g. `code`, `codium`, `windsurf` (see Cursor note below) |
+
+---
+
+## Quick start
 
 ```bash
-cd ~/multi-colab
+git clone https://github.com/YOUR_USER/multi-colab-ide.git
+cd multi-colab-ide
 chmod +x install.sh
 ./install.sh
 ```
 
-## First-time auth (once per account)
+### First-time auth (once per account)
 
 ```bash
-setup-account 1
-setup-account 2
-setup-account 3
+mci-setup 1
+mci-setup 2
+mci-setup 3
 ```
 
-Each command opens a browser login and stores credentials in a separate config directory.
-
-Edit `accounts.conf` to set friendly labels (emails are updated automatically when possible).
-
-## Daily use
-
-### Launch the IDE with a menu
+### Daily use
 
 ```bash
-multi-colab
+multi-colab-ide        # pick account from menu → IDE opens
+multi-colab-ide 2      # launch IDE with account 2
+mci-verify             # check active account
 ```
 
-### Launch a specific account directly
+---
+
+## Configure your IDE
+
+Edit `~/.config/multi-colab-ide/ide.conf`:
 
 ```bash
-multi-colab 2
+IDE_COMMAND="code"      # VS Code
+IDE_ARGS=""             # optional, e.g. "--new-window"
 ```
 
-### Switch account in an already-open terminal
+**Cursor preset** — Cursor has no built-in CLI (unlike `code`). Create a launcher script first:
 
 ```bash
-source account-switch 2
+cp config/cursor-launcher.example.sh ~/.local/bin/cursor
+chmod +x ~/.local/bin/cursor
+# Edit ~/.local/bin/cursor — set your AppImage or binary path
+cp config/ide.conf.cursor.example ~/.config/multi-colab-ide/ide.conf
 ```
 
-### Check which account is active
+Examples:
+
+| IDE | `IDE_COMMAND` | Notes |
+|-----|----------------|-------|
+| VS Code | `code` | Built-in CLI |
+| Cursor | `$HOME/.local/bin/cursor` | **Custom launcher required** — use `cursor-launcher.example.sh` |
+| VSCodium | `codium` | Built-in CLI |
+| Windsurf | `windsurf` | Built-in CLI |
+| IntelliJ | `idea` | Built-in CLI |
+
+---
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `multi-colab-ide [id] [args]` | Launch IDE with selected Google profile |
+| `mci-setup <id>` | Authenticate one account |
+| `mci-switch <id>` | Switch account in current shell (`source` it) |
+| `mci-verify` | Show active credentials and profiles |
+| `./uninstall.sh` | Remove symlinks and shell hooks |
+
+---
+
+## Shell support (bash & zsh)
+
+`install.sh` adds a hook to both `~/.bashrc` and `~/.zshrc` (if they exist).
+
+New terminals auto-load the last selected profile from:
+
+```
+~/.config/multi-colab-ide/active
+```
+
+Switch manually in any session:
 
 ```bash
-verify
+source mci-switch 2
 ```
+
+Or:
+
+```bash
+eval "$(mci-switch 2)"
+```
+
+---
+
+## WSL
+
+WSL is detected automatically. If the browser does not open during setup:
+
+```bash
+mci-setup 1 --no-launch-browser
+```
+
+Copy the printed URL into your **Windows** browser, complete sign-in, and paste the authorization code back into the WSL terminal.
+
+Tips for WSL:
+
+- Install `gcloud` inside WSL (not only on Windows)
+- Use `mci-verify` to confirm the active account
+- Launch the IDE from WSL so integrated terminals inherit the profile:
+
+  ```bash
+  multi-colab-ide 2 /path/to/project
+  ```
+
+---
 
 ## Account layout
 
-| File / dir | Purpose |
-|------------|---------|
-| `accounts.conf` | Menu labels and config paths |
-| `~/.config/gcloud-accountN/` | Isolated gcloud + ADC for account N |
-| `~/.config/gcloud-accountN/colab-cli/` | Colab session state for account N |
-| `~/.config/multi-colab/active` | Last selected profile (for `verify`) |
+Edit `accounts.conf` (created from `accounts.conf.example` on install):
+
+```
+1|work@gmail.com|~/.config/gcloud-account1
+2|personal@gmail.com|~/.config/gcloud-account2
+3|lab@company.io|~/.config/gcloud-account3
+```
+
+| Path | Purpose |
+|------|---------|
+| `accounts.conf` | Account menu labels and config paths |
+| `~/.config/gcloud-accountN/` | Isolated gcloud + ADC per account |
+| `~/.config/gcloud-accountN/colab-cli/` | Colab session state per account |
+| `~/.config/multi-colab-ide/active` | Last selected profile |
+| `~/.config/multi-colab-ide/ide.conf` | IDE launcher settings |
+
+---
 
 ## Colab CLI notes
 
-- Default auth is **ADC**, not OAuth2. Keep using ADC for agents and MCP.
-- If you use `--auth=oauth2`, the OAuth token is still stored at `~/.config/colab-cli/token.json` (shared). Prefer ADC with this toolkit.
-- Colab commands automatically use per-account session files when `COLAB_CLI_CONFIG` is set (done by `multi-colab` and `account-switch`).
+- Prefer **`--auth=adc`** (Application Default Credentials).
+- OAuth2 tokens live at `~/.config/colab-cli/token.json` (shared). ADC keeps accounts isolated.
+- The `colab` wrapper installed by this toolkit auto-loads your active profile.
 
-## ADC scopes required for Colab
+```bash
+colab --auth=adc whoami
+colab --auth=adc sessions
+```
 
-`setup-account` runs:
+---
+
+## ADC scopes
+
+`mci-setup` runs:
 
 ```bash
 gcloud auth application-default login \
   --scopes=openid,https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/colaboratory
 ```
 
+---
+
 ## Troubleshooting
 
-**`colab whoami` fails after switching**
+### `colab --auth=adc whoami` fails
 
-Run `setup-account <id>` for that profile.
+```bash
+mci-verify
+mci-setup <id>
+source mci-switch <id>
+```
 
-**Wrong account in MCP**
+### Wrong account in IDE terminals
 
-Restart the IDE via `multi-colab <id>` so MCP servers inherit the new `CLOUDSDK_CONFIG`.
+Restart the IDE via `multi-colab-ide <id>` so child processes inherit `CLOUDSDK_CONFIG`.
 
-**Migrate existing default gcloud config**
-
-Your current `~/.config/gcloud` can become account 1:
+### Migrate existing gcloud config to account 1
 
 ```bash
 cp -a ~/.config/gcloud ~/.config/gcloud-account1
+mci-setup 2
+mci-setup 3
 ```
 
-Then run `setup-account` for accounts 2 and 3.
+### Uninstall
+
+```bash
+./uninstall.sh
+```
+
+---
+
+## Project structure
+
+```
+multi-colab-ide/
+├── install.sh
+├── uninstall.sh
+├── multi-colab-ide      # IDE launcher with account menu
+├── mci-setup            # Authenticate one profile
+├── mci-switch           # Switch shell profile
+├── mci-verify           # Verify credentials
+├── colab-wrap           # colab CLI wrapper
+├── env.sh               # Shell auto-load hook
+├── lib/
+│   ├── common.sh
+│   ├── load-profile.sh
+│   └── platform.sh      # WSL / platform helpers
+├── config/
+│   ├── ide.conf.example
+│   ├── ide.conf.cursor.example
+│   └── cursor-launcher.example.sh
+├── accounts.conf.example
+└── README.md
+```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+## Tests
+
+Run the full test suite (isolated temp HOME — does not modify your config):
+
+```bash
+./tests/run-tests.sh
+```
