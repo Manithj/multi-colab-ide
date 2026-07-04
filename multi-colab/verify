@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+_script="${BASH_SOURCE[0]}"
+while [[ -L "$_script" ]]; do
+  _dir="$(cd "$(dirname "$_script")" && pwd)"
+  _script="$(readlink "$_script")"
+  [[ "$_script" != /* ]] && _script="$_dir/$_script"
+done
+TOOLKIT_DIR="$(cd "$(dirname "$_script")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$TOOLKIT_DIR/lib/common.sh"
+
+# If no env is set in this shell, try the last launcher choice.
+if [[ -z "${CLOUDSDK_CONFIG:-}" && -f "$HOME/.config/multi-colab/active" ]]; then
+  active_dir="$(cat "$HOME/.config/multi-colab/active")"
+  apply_account_env "$active_dir"
+fi
+
+echo "========================="
+echo "Google / Colab Account"
+echo "========================="
+echo
+
+if [[ -n "${CLOUDSDK_CONFIG:-}" ]]; then
+  echo "CLOUDSDK_CONFIG: $CLOUDSDK_CONFIG"
+  if label="$(account_label_for_dir "$CLOUDSDK_CONFIG" 2>/dev/null)"; then
+    echo "Profile label:   $label"
+  fi
+else
+  echo "CLOUDSDK_CONFIG: (not set — using default ~/.config/gcloud)"
+  export CLOUDSDK_CONFIG="${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}"
+fi
+
+echo
+echo "gcloud active account:"
+if email="$(gcloud_account_email)"; then
+  [[ -n "$email" ]] && echo "  $email" || echo "  (none)"
+else
+  echo "  (gcloud not available or not authenticated)"
+fi
+
+echo
+echo "Application Default Credentials:"
+if adc_configured; then
+  echo "  OK — $GOOGLE_APPLICATION_CREDENTIALS"
+else
+  echo "  Missing — run setup-account for this profile"
+fi
+
+echo
+echo "colab whoami (ADC):"
+colab_whoami | sed 's/^/  /' || true
+
+echo
+echo "Registered profiles:"
+load_accounts || exit 1
+for i in "${!ACCOUNT_IDS[@]}"; do
+  marker=" "
+  [[ "${ACCOUNT_DIRS[$i]}" == "${CLOUDSDK_CONFIG:-}" ]] && marker="*"
+  printf " %s %s) %s\n" "$marker" "${ACCOUNT_IDS[$i]}" "${ACCOUNT_LABELS[$i]}"
+done

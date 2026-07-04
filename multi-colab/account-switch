@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+_script="${BASH_SOURCE[0]}"
+while [[ -L "$_script" ]]; do
+  _dir="$(cd "$(dirname "$_script")" && pwd)"
+  _script="$(readlink "$_script")"
+  [[ "$_script" != /* ]] && _script="$_dir/$_script"
+done
+TOOLKIT_DIR="$(cd "$(dirname "$_script")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$TOOLKIT_DIR/lib/common.sh"
+
+usage() {
+  cat <<EOF
+Usage:
+  source account-switch [account-id]    # switch the current shell
+  account-switch [account-id]         # print export commands
+
+Examples:
+  source ~/.local/bin/account-switch
+  source ~/.local/bin/account-switch 2
+EOF
+}
+
+emit_exports() {
+  local config_dir="$1"
+  local label="$2"
+  mkdir -p "$config_dir/colab-cli"
+  cat <<EOF
+export CLOUDSDK_CONFIG='$config_dir'
+export GOOGLE_APPLICATION_CREDENTIALS='$config_dir/application_default_credentials.json'
+export COLAB_CLI_CONFIG='$config_dir/colab-cli/sessions.json'
+export MULTI_COLAB_ACCOUNT_DIR='$config_dir'
+# Active account: $label
+EOF
+  mkdir -p "$HOME/.config/multi-colab"
+  printf '%s\n' "$config_dir" >"$HOME/.config/multi-colab/active"
+}
+
+main() {
+  load_accounts
+
+  local choice="${1:-}"
+  if [[ -z "$choice" ]]; then
+    print_account_menu
+    read -r -p "Choice: " choice
+  fi
+
+  local idx
+  if ! idx="$(find_account_index "$choice")"; then
+    echo "Invalid choice: $choice" >&2
+    exit 1
+  fi
+
+  local config_dir="${ACCOUNT_DIRS[$idx]}"
+  local label="${ACCOUNT_LABELS[$idx]}"
+
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    apply_account_env "$config_dir"
+    echo "Switched to: $label"
+    echo "  CLOUDSDK_CONFIG=$CLOUDSDK_CONFIG"
+  else
+    emit_exports "$config_dir" "$label"
+    echo "# Run: eval \"\$(account-switch $choice)\"" >&2
+  fi
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+main "$@"

@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+_script="${BASH_SOURCE[0]}"
+while [[ -L "$_script" ]]; do
+  _dir="$(cd "$(dirname "$_script")" && pwd)"
+  _script="$(readlink "$_script")"
+  [[ "$_script" != /* ]] && _script="$_dir/$_script"
+done
+TOOLKIT_DIR="$(cd "$(dirname "$_script")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$TOOLKIT_DIR/lib/common.sh"
+
+usage() {
+  cat <<EOF
+Usage: setup-account <account-id>
+
+Authenticate one Google profile into its isolated gcloud config directory.
+
+This runs:
+  gcloud auth login
+  gcloud auth application-default login (with Colab scopes)
+
+Example:
+  $TOOLKIT_DIR/setup-account 1
+EOF
+}
+
+main() {
+  local choice="${1:-}"
+  if [[ -z "$choice" ]]; then
+    print_account_menu
+    read -r -p "Choice: " choice
+  fi
+
+  load_accounts
+  local idx
+  if ! idx="$(find_account_index "$choice")"; then
+    echo "Invalid choice: $choice" >&2
+    exit 1
+  fi
+
+  local config_dir="${ACCOUNT_DIRS[$idx]}"
+  local label="${ACCOUNT_LABELS[$idx]}"
+
+  mkdir -p "$config_dir/colab-cli"
+  export CLOUDSDK_CONFIG="$config_dir"
+
+  echo "Setting up: $label"
+  echo "Config dir: $CLOUDSDK_CONFIG"
+  echo
+
+  echo "Step 1/2: gcloud auth login"
+  gcloud auth login
+
+  echo
+  echo "Step 2/2: gcloud auth application-default login (Colab scopes)"
+  gcloud auth application-default login --scopes="$COLAB_ADC_SCOPES"
+
+  echo
+  email="$(gcloud_account_email || true)"
+  if [[ -n "$email" && -f "$ACCOUNTS_FILE" ]]; then
+    # Replace the label field for this account id with the authenticated email.
+    awk -F'|' -v id="$choice" -v email="$email" '
+      $1 == id { $2 = email }
+      { print $1 "|" $2 "|" $3 }
+    ' "$ACCOUNTS_FILE" >"$ACCOUNTS_FILE.tmp" && mv "$ACCOUNTS_FILE.tmp" "$ACCOUNTS_FILE"
+  fi
+
+  echo "Done."
+  echo "Verify with: CLOUDSDK_CONFIG=$CLOUDSDK_CONFIG $TOOLKIT_DIR/verify"
+  echo "Launch Cursor: multi-colab $choice"
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+main "$@"

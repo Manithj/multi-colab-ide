@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+_script="${BASH_SOURCE[0]}"
+while [[ -L "$_script" ]]; do
+  _dir="$(cd "$(dirname "$_script")" && pwd)"
+  _script="$(readlink "$_script")"
+  [[ "$_script" != /* ]] && _script="$_dir/$_script"
+done
+TOOLKIT_DIR="$(cd "$(dirname "$_script")" && pwd)"
+# shellcheck source=lib/common.sh
+source "$TOOLKIT_DIR/lib/common.sh"
+
+usage() {
+  cat <<EOF
+Usage: multi-colab [account-id]
+
+Launch Cursor with an isolated Google Cloud / Colab credential profile.
+
+Examples:
+  multi-colab          # interactive menu
+  multi-colab 2        # launch with account 2
+EOF
+}
+
+main() {
+  local choice="${1:-}"
+  if [[ -z "$choice" ]]; then
+    print_account_menu
+    read -r -p "Choice: " choice
+  else
+    shift
+  fi
+
+  load_accounts
+
+  local idx
+  if ! idx="$(find_account_index "$choice")"; then
+    echo "Invalid choice: $choice" >&2
+    exit 1
+  fi
+
+  local config_dir="${ACCOUNT_DIRS[$idx]}"
+  local label="${ACCOUNT_LABELS[$idx]}"
+
+  apply_account_env "$config_dir"
+
+  echo
+  echo "Launching Cursor with:"
+  echo "  Account : $label"
+  echo "  Config  : $CLOUDSDK_CONFIG"
+  echo
+
+  if ! adc_configured; then
+    echo "Warning: ADC not set up for this profile yet."
+    echo "Run once:"
+    echo "  $TOOLKIT_DIR/setup-account $choice"
+    echo
+  fi
+
+  exec "$(cursor_bin)" "$@"
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+main "$@"
