@@ -1,4 +1,4 @@
-# multi-colab
+# multi-colab-cli
 
 Launch **IDE** with an isolated Google Cloud credential profile so Colab CLI, `gcloud`, and Colab MCP all use the correct Google account.
 
