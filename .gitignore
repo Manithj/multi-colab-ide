@@ -14,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 !multi-colab/lib/
 !multi-colab/lib/**
 lib64/
